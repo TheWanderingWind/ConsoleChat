@@ -1,21 +1,46 @@
 const readline = require('readline');
 const http = require('http');
-
-/**
- * Зробити +- нормальну консольне управління
- * Зробити так, щоб деякий текст завжди був зверху і замінювався при певних умовах
- * Реалізувати відправку до сервера елементарного рядка
- * Реалізувати отримання від сервера елементарного рядка
- */
+const { rejects } = require('assert');
 
 let client, rl, serverName;
 
 const options = {
     host: '127.0.0.1',
     port: 8080,
-    path: '/length_request',
-    timeout: 2000,
+    path: '/',
+    timeout: 4000,
 };
+
+function connect(host) {
+    return new Promise((resolve, rejects) => {
+        if (host !== null) {
+            options.host = host;
+        }
+
+        client = http.request(options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                console.log(`Статус з'єднання: ${res.statusCode}`);
+                console.log("Зміст відповіді:");
+                console.log(data);
+                resolve(data);
+            });
+
+            res.on('error', (error) => {
+                rejects(error)
+            });
+        });
+
+        client.on('error', (error) => {
+            rejects(error);
+        });
+    });
+}
 
 rl = readline.createInterface({
     input: process.stdin,
@@ -32,7 +57,7 @@ const maxTemplateLog = 10
 const maxFullLog = 200
 
 function writeLog(input, log, logFull, type="new", clearPosition=1) {
-    if (log.length >= maxTemplateLog) connectLog.splice(clearPosition, clearPosition);
+    if (log.length >= maxTemplateLog) connectLog.splice(clearPosition, 1);
     if (logFull.length >= maxFullLog) connectLog.splice(0, 0);
     
     if (type == "new") {
@@ -77,20 +102,23 @@ function consoleConnectToServer() {
             console.clear()
             writeConnectLog(`Спроба підключитись до ${input}, зачекайте...`)
             console.log(connectLog.join('\n'));
-            // Спроба підключитись
-            if (input.toLowerCase() === "connect") {
-                writeConnectLog(" (Підключенно)", 'add')
-                console.clear();
-                //console.log(`${input.toLowerCase} ?= ${"connect"}`)
-                connectedToServer("Test Server");
-            } else {
-                writeConnectLog(" (Невдачна)", 'add')
-                console.clear();
-                //console.log(`${input.toLowerCase} ?= ${"connect"}`)
-                console.log(connectLog.join('\n'));
-                console.log("Перевищен час очікування відповіді сервера");
-            }
-            consoleConnectToServer();
+            
+            connect(input).then(
+                (result) => {
+                    writeConnectLog(" (Підключенно)", 'add')
+                    console.clear();
+                    console.log(client);
+                    connectedToServer("Test Server");
+                },
+                (error) => {
+                    writeConnectLog(" (Невдачна)", 'add')
+                    console.clear();
+                    console.log(connectLog.join('\n'));
+                    console.log("Перевищен час очікування відповіді сервера");
+                    console.log(error);
+                    consoleConnectToServer();
+                }
+            );
         }
     });
 }
